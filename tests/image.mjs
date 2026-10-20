@@ -29,7 +29,12 @@ try {
   assert.match(fs.readFileSync(live + '/etc/systemd/system/greetd.service.d/live.conf', 'utf8'), /Requires=koya-live-setup.service/);
   assert.equal(fs.readFileSync(live + '/etc/koya-live', 'utf8'), 'test\n');
   const packages = new Set(fs.readFileSync(profile + '/packages.x86_64', 'utf8').trim().split('\n'));
-  for (const name of ['koya-shell', 'hyprland', 'greetd', 'polkit', 'pipewire-pulse', 'firefox', 'nautilus', 'kitty', 'pavucontrol', 'grim']) assert(packages.has(name), name);
+  for (const name of ['koya-shell', 'hyprland', 'greetd', 'polkit', 'pipewire-pulse', 'firefox', 'nautilus', 'kitty', 'pavucontrol', 'grim', 'fakeroot']) assert(packages.has(name), name);
+  const targetPackages = new Set(fs.readFileSync(app + '/payload/packages.txt', 'utf8').split('\n'));
+  for (const name of ['base-devel', 'git', 'qt5-wayland', 'qt6-wayland', 'ttf-jetbrains-mono-nerd', 'vim', 'noto-fonts-cjk', 'plymouth']) {
+    assert(!packages.has(name), `${name} is excluded from the live image`);
+    assert(targetPackages.has(name), `${name} remains available on the installed system`);
+  }
   assert(!packages.has('weston'));
   const hypr = fs.readFileSync(live + '/etc/skel/.config/hypr/hyprland.lua', 'utf8');
   assert(hypr.includes('/usr/bin/koya-shell'));
@@ -38,7 +43,7 @@ try {
   assert(!hypr.includes('hl.exec_cmd("hypridle")'));
   const liveHypr = fs.readFileSync(live + '/etc/skel/.config/hypr/live.lua', 'utf8');
   assert.match(liveHypr, /hl\.exec_cmd\("\/usr\/local\/bin\/koya-installer"\)/);
-  assert.match(liveHypr, /float = true/);
+  assert.doesNotMatch(liveHypr, /float\s*=\s*true/);
   assert(fs.existsSync(live + '/etc/skel/.local/share/koya-bar/wallpapers/catching-the-desert.jpeg'));
   assert.match(fs.readFileSync(live + '/usr/share/applications/koya-installer.desktop', 'utf8'), /Exec=\/usr\/local\/bin\/koya-installer/);
   assert.match(fs.readFileSync(live + '/usr/share/polkit-1/actions/org.koya.installer.policy', 'utf8'), /\/opt\/koya-installer\/backend\/install.sh/);

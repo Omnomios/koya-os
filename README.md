@@ -1,181 +1,152 @@
-# Koya Installer
+# Koya Shell Live
 
-The Koya Shell live CD. It boots straight into the Koya desktop on Hyprland,
-signed in to a temporary `live` account, and opens the installer. **Install**
-starts the wizard; **Try it out** closes it and leaves you on the desktop.
-**Install Koya** in the app launcher opens it again.
+[Koya Shell](https://github.com/Omnomios/koya-bar), a desktop shell built on
+Koya, for Hyprland and Arch, on a USB stick. Boot it and you're on the full
+desktop, running from the stick. Nothing on the computer is touched, and
+nothing you do survives a shutdown. Try it out without sacrificing a machine
+to it.
 
-Installing downloads current Arch packages and the latest `koya-shell` from the
-official Koya repository. Nothing is pinned. The versions that went in are
-recorded in `/var/lib/koya-installer/desktop-packages`. The installer sets up
-greetd and Hyprland; the theme, wallpaper and desktop configuration come from
-the image's profile. The package itself doesn't enable any services.
+It's one shell from the login screen to the lock screen, with one theme across
+all of it, and the visual polish of a web stack without the cruft. There's no
+browser underneath; Koya draws it on the GPU in around 48 MB of memory.
 
-## Preview
+If you decide to keep it, there's an installer on the desktop.
+
+## Try it
+
+Download the latest ISO from the
+[releases](https://github.com/Omnomios/koya-os/releases) and write it to
+a USB stick. Any stick big enough will do; it gets erased. Replace `/dev/sdX`
+with the stick, and write to the **whole device**, not a partition:
 
 ```bash
-./run.sh --preview
+sha256sum -c koya-installer-VERSION-x86_64.iso.sha256
+dd if=koya-installer-VERSION-x86_64.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-Preview runs the real wizard against a mock layer (`apps/mock.js`): fixture
-Wi-Fi networks, four disks (two usable, two refused) and a staged installation
-with command output. It never calls the installation backend or touches a
-network connection. It starts offline; join **Koya Studio** with the password
-`koya-preview`.
+A graphical image writer works too. Boot an x86_64 UEFI computer from the stick
+with Secure Boot off. Legacy BIOS isn't supported.
 
-| Variable | Effect |
-|---|---|
-| `KOYA_INSTALLER_MOCK_ONLINE=1` | Start with a wired connection |
-| `KOYA_INSTALLER_MOCK_FAIL=<stage>` | Stop the installation at that stage (e.g. `packages`) |
-| `KOYA_INSTALLER_MOCK_SPEED=<n>` | Speed the installation up (e.g. `4`) |
-| `KOYA_INSTALLER_MOCK_WIFI=none` | A computer without a Wi-Fi device |
-| `KOYA_INSTALLER_MOCK_CABLE=<s>` | Plug a network cable in after `s` seconds |
+It signs straight in to a temporary `live` account (password `live`, with
+passwordless sudo) and opens the installer. Choose **Try it out** to close it.
+You're then on the same desktop an installed system gets: the bar, launcher,
+notifications, Wi-Fi, settings, the theme and the wallpaper. Firefox, Files, a
+terminal, audio controls and screenshot tools are there to use. Idle locking is
+off.
 
-Preview needs Koya 0.7.1 or newer installed, with its shared assets and
-matching `process` and `dbus` plugins.
+The live system runs from a compressed image with a temporary overlay on top.
+Wi-Fi passwords, files and settings all go at shutdown.
 
-## The wizard
+The live image omits build tools, Git, Vim, CJK and JetBrains Nerd Fonts, and
+extra Qt components to keep the download smaller. These remain in the package
+selection for an installed system.
 
-After the welcome screen: connect to a network, choose a disk, choose
-encryption and optional apps, set the disk passphrase (only when encrypting),
-create the account, then review. Encryption and every optional app are on by
-default.
+## Install it
 
-The timezone comes from the system's zone tables (`backend/timezones.sh`).
-Search by city, country, region or common name (`syd`, `germany`, `uk`). Each
-match shows the time there and its offset; Enter takes the top one.
+**Install Koya** in the launcher opens the installer again. It needs an
+internet connection, because it installs current packages from Arch and the
+latest `koya-shell` from Koya's signed repository rather than copying the
+stick. Nothing is pinned, and updates afterwards are plain `pacman -Syu`.
 
-The review names the disk that will be erased, and **Erase and install** is the
-confirmation. The whole disk is used: a 512 MiB EFI partition and an ext4 root.
-There's no manual partitioning or dual boot, and the kernel and filesystem are
-fixed.
+It takes a whole disk: a 512 MiB EFI partition and an ext4 root, encrypted by
+default. There's no manual partitioning or dual boot. The review page names the
+disk it's about to erase, and **Erase and install** is the point of no return.
+If the installation fails, the installer cleans up its own mounts, but whatever
+was on the disk is already gone.
 
-During installation the wizard shows each stage by name, with the command output
-underneath on request. Navigation is locked once it starts. A failure stops the
-job and cleans up the installer's own mounts and mapping. It doesn't restore
-anything that was erased. If the window closes unexpectedly, the worker loses
-its pipes, fails at its next write and cleans up the same way.
+You get the greeter, lock screen and GUI authentication along with the desktop.
+Firefox, Files, advanced audio controls and screenshot tools are optional. Root
+login is locked and your account can use sudo. The package versions that went
+in are listed in `/var/lib/koya-installer/desktop-packages`.
+
+## If something goes wrong
+
+Switch to another VT and log in as `root` with no password. SSH isn't enabled.
+
+- desktop startup: `journalctl -u greetd -u koya-live-setup`
+- installer: `journalctl -t koya-installer`
+- wallpaper preparation: `/var/log/koya-live/wallpaper.log`
 
 ## Build the image
 
-On an up-to-date x86_64 Arch Linux machine, install the build tools and run the
-build as root:
+On an up-to-date x86_64 Arch Linux machine, as root:
 
 ```bash
 pacman -S --needed archiso archlinux-keyring
 ./build-image.sh
 ```
 
-That produces `dist/koya-installer-VERSION-x86_64.iso`, its SHA-256 checksum and
-a list of the live image's package versions. Set `KOYA_IMAGE_VERSION` to give a
-release its own version; an optional argument sets the output directory. Allow
-about 12 GiB of space and an internet connection. Each build starts in a fresh
-`.work/image.*` directory and leaves it there to inspect.
+That writes `dist/koya-installer-VERSION-x86_64.iso`, its SHA-256 checksum and a
+list of the live image's packages. Set `KOYA_IMAGE_VERSION` to version a build;
+an optional argument changes the output directory. Allow about 12 GiB and an
+internet connection. Archiso 91 or newer is needed. Each build works in a fresh
+`.work/image.*` directory and leaves it behind to inspect.
 
-`./build-image.sh --prepare-only` assembles and verifies the profile as an
-ordinary user, without Archiso. It needs GnuPG and the usual shell tools. The
-full build needs Archiso 91 or newer.
+`./build-image.sh --prepare-only` assembles and checks the profile as an
+ordinary user, without Archiso. It needs GnuPG and the usual shell tools.
 
-Every build downloads current Arch packages and Koya packages from the official
-repository. The installed system uses the same repository for Koya and its
-plugins. Nothing depends on a particular USB stick, partition UUIDs or a home
-directory. Koya packages and repository metadata are checked against the pinned
-signing key, using a keyring of the build's own. The live system runs from a
-compressed filesystem with a temporary writable overlay, so Wi-Fi passwords and
-anything else changed in the live session are gone at shutdown.
+Every build downloads current Arch and Koya packages. Koya packages and
+repository metadata are checked against the pinned signing key, in a keyring of
+the build's own; the host's pacman setup is left alone.
 
-## GitHub builds and releases
+## Releases
 
 `.github/workflows/release.yml` runs on every push to `master`, or by hand from
 the Actions tab. It runs `npm test`, builds the ISO in a privileged Arch Linux
-container on an Ubuntu runner, checks the release files and publishes a release
-on the exact commit. The build job has read-only access to the repository; only
-the publishing job can create releases. It uses the built-in `GITHUB_TOKEN`, so
-no secrets are needed unless your organisation restricts workflow permissions.
+container and publishes a release on that commit, tagged like
+`live-2026.10.20-12.1-abcdef0` (UTC date, run number, attempt and short commit).
+The build job only has read access; the publishing job creates the release with
+the built-in `GITHUB_TOKEN`, so no secrets are needed unless your organisation
+restricts workflow permissions.
 
-Release tags look like `live-2026.10.20-12.1-abcdef0`: the UTC date, run number,
-attempt and short commit. A rerun gets a new version. Each release has the ISO,
-its checksum and the package list. [GitHub caps release assets at 2 GiB](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas), so an
-ISO over 1900 MiB is uploaded in numbered parts, with instructions and checksums
-for putting it back together. Build artifacts stay in Actions for seven days.
-A release only goes out after a successful build, but nothing boots the ISO or
-runs the graphical preview.
+[GitHub caps release assets at 2 GiB](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas),
+so an ISO of 2 GiB or more goes up in numbered parts, with instructions and
+checksums for joining them. Nothing boots the ISO before it's published.
 
-## Write and boot
-
-Any USB stick big enough for the image will do. Unmount its partitions, then
-write the image to the **whole device**. Replace `/dev/sdX` with the stick; this
-erases it:
+## Development
 
 ```bash
-cd dist
-sha256sum -c koya-installer-VERSION-x86_64.iso.sha256
-dd if=koya-installer-VERSION-x86_64.iso of=/dev/sdX bs=4M status=progress conv=fsync
+npm test
+./run.sh --preview
+./run.sh --preview --self-test
 ```
 
-A graphical image writer works too. Spare space on a bigger stick goes unused.
-Boot an x86_64 UEFI computer with Secure Boot off; legacy BIOS isn't supported.
+`--preview` runs the installer against mock networks, disks and a staged
+installation (`apps/mock.js`), without touching either. It starts offline; join
+**Koya Studio** with the password `koya-preview`. It needs Koya 0.7.1 or newer
+with its shared assets and the `process` and `dbus` plugins. These variables
+change the mock:
 
-Installing needs the internet, because the packages come from Arch and Koya's
-signed repository at install time. The Wi-Fi connection you choose is for the
-live session only; the installed desktop keeps its own saved connections.
+| Variable | Effect |
+|---|---|
+| `KOYA_INSTALLER_MOCK_ONLINE=1` | Start with a wired connection |
+| `KOYA_INSTALLER_MOCK_FAIL=<stage>` | Fail the installation at that stage (e.g. `packages`) |
+| `KOYA_INSTALLER_MOCK_SPEED=<n>` | Speed the installation up (e.g. `4`) |
+| `KOYA_INSTALLER_MOCK_WIFI=none` | No Wi-Fi device |
+| `KOYA_INSTALLER_MOCK_CABLE=<s>` | Plug a cable in after `s` seconds |
 
-## The live desktop
+`--self-test` drives the whole wizard against the mock and writes screenshots to
+`/tmp`. Add `KOYA_INSTALLER_PREVIEW_RESIZE=1` to also test a window resize
+during installation.
 
-The live desktop has Firefox, Files, a terminal, audio controls and screenshot
-tools, with the same theme, wallpaper and shell as an installed system. The
-account is `live`, password `live`, with passwordless sudo. Idle locking is off.
-
-The installer is an ordinary application. It starts the root backend through
-polkit when installation begins, and only the active local live account is
-authorised to do that without a password. Closing it leaves the desktop running.
-
-To debug, switch to another VT and log in as `root` with no password. SSH isn't
-enabled. Logs:
-
-- desktop startup: `journalctl -u greetd -u koya-live-setup`
-- installer: `journalctl -t koya-installer`
-- wallpaper preparation: `/var/log/koya-live/wallpaper.log`
-
-## The installed desktop
-
-An installed system gets the theme, the chosen wallpaper, the greeter, the lock
-screen and GUI authentication. Pacman owns the shell under
-`/usr/share/koya-shell`. The optional apps are Firefox, Files, advanced audio
-controls and screenshot tools; shortcuts for any left out are removed. Root
-login is locked, and the new account can use sudo.
-
-## Command line and development
-
-The GUI and the command line share one modular Bash backend. The GUI talks to it
-in bounded JSON lines over private pipes. Credentials never go into argv,
-environment variables, temporary files or diagnostic output, and no shell
-command is built from user input. The backend checks the disk's identity and
-whether it's mounted or the boot source immediately before erasing it, and only
-one installation can run at a time.
+The installer's GUI and command line share one Bash backend:
 
 ```bash
 ./install.sh /dev/TARGET --plan
 ./install.sh /dev/TARGET --user user --hostname koya
 ./install.sh /dev/TARGET --no-encryption --apps firefox,files
-npm test
-./run.sh --preview --self-test
 ```
 
-The last command drives the real wizard against fixtures and writes screenshots
-under `/tmp`. It also checks that moving to the installation page keeps the
-window's resolution and scale. To test a window resize after installation as
-well, run `KOYA_INSTALLER_PREVIEW_RESIZE=1 ./run.sh --preview --self-test`.
+The GUI talks to it in bounded JSON lines over private pipes. Passwords never go
+into arguments, environment variables, temporary files or logs, and no shell
+command is built from user input. Just before erasing, the backend checks the
+disk is the one chosen, isn't mounted and isn't the boot stick, and only one
+installation runs at a time. `tests/vm-install.sh` runs it for real, but only
+inside a QEMU guest, where it erases `/dev/vda`.
 
-`tests/vm-install.sh` runs the real backend. It refuses to run anywhere but a
-QEMU guest, and it erases that guest's `/dev/vda`.
-
-The installer's UI helpers in `apps/`, and the fonts and icons in `assets/`,
-are adapted from Koya Bar. No shell, desktop apps or greeter are bundled for the
-UI. The installed desktop uses the official `koya-shell` package and updates
-with `pacman -Syu`; the installer doesn't clone or compile anything.
-After editing the profile, run `tools/checksums.mjs` to refresh the payload
-checksums.
+The installer's UI helpers, fonts and icons are adapted from Koya Shell. After
+editing anything under `payload/profile`, run `tools/checksums.mjs` to refresh
+the payload checksums.
 
 ## Licence
 

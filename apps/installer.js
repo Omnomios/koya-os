@@ -294,9 +294,10 @@ export async function installer() {
       const copyHeight = 24 + 3 * 18 + 3 * SPACE.s;
       const lead = Math.max(0, Math.round((bodyHeight() - copyHeight) / 2 - SPACE.s));
       await add(await UI.createElement(win, { item: { size: { x: mainWidth(), y: lead } } }), lead);
-      await add(await centred('A desktop shell for Hyprland on Arch Linux, built on Koya.', TYPE.heading, 24, TEXT.primary), 24);
-      for (const line of ['One shell from the login screen to the lock screen, with one theme across all of it,',
-        'in around 48 MB of memory. The UI is plain JavaScript rendered on the GPU,', 'and it’s meant to be pulled apart.'])
+      await add(await centred('A desktop shell built on Koya, for Hyprland and Arch.', TYPE.heading, 24, TEXT.primary), 24);
+      for (const line of ['One shell from the login screen to the lock screen, with one theme across all of it.',
+        'The visual polish of a web stack without the cruft. There’s no browser underneath;',
+        'Koya draws it on the GPU in around 48 MB of memory.'])
         await add(await centred(line, TYPE.body, 18, TEXT.secondary), 18 - SPACE.s);
     },
     // Connect: the connection, then Wi-Fi networks; a chosen secured one asks for its password in place.

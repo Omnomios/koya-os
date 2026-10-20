@@ -1,3 +1,4 @@
+# Base system and installation tools
 base
 linux
 linux-firmware
@@ -15,6 +16,19 @@ parted
 curl
 jq
 gnupg
+fakeroot
+# Desktop, graphics and input
+hyprland
+hypridle
+gdk-pixbuf2
+librsvg
+greetd
+polkit
+accountsservice
+upower
+power-profiles-daemon
+brightnessctl
+adw-gtk-theme
 networkmanager
 modemmanager
 adwaita-cursors
@@ -29,3 +43,20 @@ ttf-hack
 koya
 koya-shell
 helix-plugins
+# Networking, sound and desktop integration
+bluez
+bluez-utils
+openssh
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+xdg-desktop-portal-gtk
+xdg-desktop-portal-hyprland
+# Everyday desktop applications and keybinding commands
+kitty
+playerctl
+less
+sudo
+pacman-contrib
+wget

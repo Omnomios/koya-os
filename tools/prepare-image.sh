@@ -20,10 +20,10 @@ cp -a "$root/boot" "$app/"
 cp "$root/run.sh" "$root/install.sh" "$root/LICENSE" "$root/NOTICE" "$app/"
 printf '%s\n' "$version" > "$app/IMAGE_VERSION"
 printf '%s\n' "$version" > "$live/etc/koya-live"
-# Include the same desktop and optional apps offered by the installer, plus
-# the live image's installation tools. Keep the target package list separate.
+# Keep the live desktop lean with its own package list. Target-only fonts,
+# toolchains and applications stay in payload/packages.txt for installation.
 {
-  cat "$root/image/packages.x86_64" "$root/payload/packages.txt"
+  cat "$root/image/packages.x86_64"
   jq -r '.[].packages[]' "$root/backend/optional-apps.json"
 } | sed -E '/^[[:space:]]*(#|$)/d' | sort -u > "$profile/packages.x86_64"
 # useradd copies this profile when the live account is created at boot.

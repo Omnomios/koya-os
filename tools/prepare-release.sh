@@ -12,7 +12,7 @@ done
 (cd "$source_dir" && sha256sum --check -- "$image.sha256")
 # Release assets must be below 2 GiB. Tests use a smaller part size to cover
 # this path without allocating multi-gigabyte fixtures.
-part_bytes=${KOYA_RELEASE_PART_BYTES:-1992294400}
+part_bytes=${KOYA_RELEASE_PART_BYTES:-2147483647}
 [[ $part_bytes =~ ^[1-9][0-9]{0,9}$ ]] && (( part_bytes < 2147483648 )) || {
   printf 'Release part size must be between 1 byte and 2 GiB minus 1 byte.\n' >&2; exit 1;
 }
