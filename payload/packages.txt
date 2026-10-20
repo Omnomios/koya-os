@@ -1,0 +1,59 @@
+# Arch base
+base
+linux
+linux-firmware
+intel-ucode
+amd-ucode
+cryptsetup
+dosfstools
+e2fsprogs
+# Desktop, graphics and input
+hyprland
+hypridle
+mesa
+vulkan-intel
+vulkan-radeon
+vulkan-nouveau
+vulkan-virtio
+vulkan-swrast
+gdk-pixbuf2
+librsvg
+greetd
+polkit
+accountsservice
+upower
+power-profiles-daemon
+brightnessctl
+adw-gtk-theme
+noto-fonts
+noto-fonts-cjk
+ttf-hack
+ttf-jetbrains-mono-nerd
+# Networking, sound and desktop integration
+networkmanager
+modemmanager
+bluez
+bluez-utils
+openssh
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+xdg-desktop-portal-gtk
+xdg-desktop-portal-hyprland
+qt5-wayland
+qt6-wayland
+# AUR package build prerequisites
+base-devel
+git
+# Everyday desktop applications and keybinding commands
+kitty
+playerctl
+less
+vim
+sudo
+pacman-contrib
+wget
+jq
+# Keep the laptop's existing graphical LUKS unlock path
+plymouth

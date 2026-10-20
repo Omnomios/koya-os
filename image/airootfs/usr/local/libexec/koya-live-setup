@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+[[ -f /etc/koya-live ]] || { printf 'This setup is only for the live image.\n' >&2; exit 1; }
+if ! id live >/dev/null 2>&1; then
+  useradd --create-home --user-group --groups wheel --shell /bin/bash --comment 'Koya Live' live
+  printf 'live:live\n' | chpasswd
+fi
+install -d -m 700 /var/lib/koya-greeter
+printf '%s\n' live > /var/lib/koya-greeter/last-user
+# Pre-render the imported wallpaper so it is ready when the shell starts.
+install -d -m 755 /var/log/koya-live
+if ! timeout -k 2 60 runuser -u live -- env -u DISPLAY -u WAYLAND_DISPLAY \
+  /usr/bin/koya -m /usr/share/koya/assets -m /opt/koya-installer/payload \
+  -n /usr/lib/koya-shell -i prepare-wallpaper.js > /var/log/koya-live/wallpaper.log 2>&1; then
+  cat /var/log/koya-live/wallpaper.log >&2
+  printf 'The live desktop will prepare its wallpaper when it starts.\n' >&2
+fi

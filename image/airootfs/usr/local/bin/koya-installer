@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+# One ordinary application per live session; closing it leaves Hyprland and
+# the Koya shell running, and a later launch can open it again.
+exec systemd-cat --identifier=koya-installer /usr/bin/flock --nonblock \
+  "$XDG_RUNTIME_DIR/koya-installer-window.lock" /opt/koya-installer/run.sh

@@ -1,0 +1,8 @@
+{
+  "Wallpaper": "user:catching-the-desert.jpeg",
+  "Skin": "{\"name\":\"Koya\",\"palette\":{\"background\":[0.050980392156862744,0.050980392156862744,0.0784313725490196,1],\"foreground\":\"#f4e9d8\",\"accent\":\"#d96a1d\",\"good\":[0.11372549019607843,0.8509803921568627,0.5568627450980392,1]}}",
+  "GreeterWallpaper": true,
+  "ClockTimeFormat": "24h",
+  "ClockShowDate": true,
+  "ClockShowSeconds": false
+}

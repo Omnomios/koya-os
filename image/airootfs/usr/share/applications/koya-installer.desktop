@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Koya
+Comment=Install Koya on your computer
+Exec=/usr/local/bin/koya-installer
+Icon=/opt/koya-installer/assets/brand/koya-fish.png
+Terminal=false
+Categories=System;
+StartupNotify=false

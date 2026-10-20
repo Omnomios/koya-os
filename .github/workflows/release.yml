@@ -1,0 +1,92 @@
+name: Build and release live ISO
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Choose the image version
+        id: version
+        run: |
+          version="$(date -u +%Y.%m.%d)-${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}-${GITHUB_SHA:0:7}"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Make room for the desktop image
+        # These unused SDKs are on the disposable GitHub-hosted runner.
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h "$GITHUB_WORKSPACE"
+
+      - name: Test and build in Arch Linux
+        env:
+          KOYA_IMAGE_VERSION: ${{ steps.version.outputs.version }}
+        # Archiso needs mounts, loop devices and chroot inside the container.
+        # No GitHub credentials are passed to the build container.
+        run: |
+          docker run --rm --privileged \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace \
+            --env KOYA_IMAGE_VERSION \
+            archlinux:base bash tools/ci-build.sh
+
+      - name: Keep the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: koya-live-${{ steps.version.outputs.version }}
+          path: dist/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Download the tested image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: koya-live-${{ needs.build.outputs.version }}
+          path: release
+
+      - name: Verify the downloaded release files
+        working-directory: release
+        run: sha256sum --check SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IMAGE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          latest=false
+          if [[ $(gh api "repos/$GH_REPO/git/ref/heads/master" --jq .object.sha) == "$GITHUB_SHA" ]]; then
+            latest=true
+          fi
+          gh release create "live-$IMAGE_VERSION" release/* \
+            --target "$GITHUB_SHA" \
+            --title "Koya Live $IMAGE_VERSION" \
+            --latest="$latest" \
+            --notes-file release/README.txt

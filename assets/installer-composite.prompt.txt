@@ -1,0 +1,13 @@
+Generated using the built-in image_gen tool. Original wallpaper is the style reference.
+
+BOTTOM LEFT
+Use case: stylized-concept. Create a high resolution square transparent PNG corner illustration for the Koya installer, ideally 2048x2048. Reference image is style and subject reference only. Recreate ONLY the LOWER LEFT corner vignette as a standalone detailed asset: one elegant orange, ivory and gold koi viewed directly overhead, swimming toward the right with flowing delicate fins; dark petrol teal sculptural rocks, restrained copper leaves and fine gold current lines along the LEFT and BOTTOM edges. Match the reference's refined ink-dark Japanese pond aesthetic and realistic painterly detail. Concentrate fish near lower-left quadrant but inset enough to show entire fish. Artwork can reach left and bottom edges; upper and right portions dissolve naturally into actual transparent alpha, with no rectangular opaque background, no black matte, no checkerboard. Leave the upper right half largely transparent for the installer panel. No text, no UI. Generate anew with crisp scales and fins, do not simply crop or enlarge reference.
+
+TOP RIGHT
+Use case: stylized-concept. Create a high resolution square transparent PNG corner illustration for the Koya installer, ideally 2048x2048. Reference image is style and subject reference only. Recreate ONLY the UPPER RIGHT corner vignette as a standalone detailed asset: one elegant orange, ivory and gold koi viewed directly overhead, swimming toward the lower left with tail curling upward and flowing delicate fins; dark petrol teal sculptural rocks, restrained copper leaves and fine gold current lines along the TOP and RIGHT edges. Match the reference's refined ink-dark Japanese pond aesthetic and realistic painterly detail. Concentrate fish near upper-right quadrant but inset enough to show entire fish. Artwork can reach top and right edges; lower and left portions dissolve naturally into actual transparent alpha, with no rectangular opaque background, no black matte, no checkerboard. Leave the lower left half largely transparent for the installer panel. No text, no UI. Generate anew with crisp scales and fins, do not simply crop or enlarge reference.
+
+RADIAL BASE
+Generated at runtime with Koya/Image.gradient: a centered radial gradient from
+#142b30 to #0b0f12, radius 0.5. Settings live in apps/brand.js.
+
+Corner assets are 1254x1254 RGBA, rendered at no more than 600 logical pixels per side; the radial base stretches to the canvas.

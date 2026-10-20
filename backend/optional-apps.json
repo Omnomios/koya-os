@@ -1,0 +1,38 @@
+[
+  {
+    "id": "firefox",
+    "name": "Firefox",
+    "description": "Web browser · Super+B",
+    "packages": [
+      "firefox"
+    ]
+  },
+  {
+    "id": "files",
+    "name": "Files",
+    "description": "Nautilus file manager · Super+E",
+    "packages": [
+      "nautilus"
+    ]
+  },
+  {
+    "id": "audio",
+    "name": "Audio controls",
+    "description": "Advanced sound configuration",
+    "packages": [
+      "pavucontrol"
+    ]
+  },
+  {
+    "id": "screenshots",
+    "name": "Screenshot tools",
+    "description": "Select, capture and annotate · Print",
+    "packages": [
+      "grim",
+      "slurp",
+      "swappy",
+      "wl-clipboard",
+      "otf-font-awesome"
+    ]
+  }
+]

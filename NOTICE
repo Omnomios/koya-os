@@ -1,0 +1,13 @@
+Koya Installer installs the Koya desktop (https://www.koya-ui.com/).
+UI helpers in apps/ and selected fonts and icons in assets/ were adapted from
+Koya Desktop Shell revision 72970d85a6be7b8c51172509e51b83b2079fccaa.
+Project material is licensed under Creative Commons Attribution 4.0
+International; see LICENSE. Attribute it to the Koya Desktop Shell contributors
+and link to https://github.com/Omnomios/koya-bar.
+
+Third-party material retains its own licence:
+
+- assets/fonts/Inter-Regular.ttf and Inter-SemiBold.ttf: The Inter Project
+  Authors, SIL Open Font License 1.1. Full notice: assets/fonts/OFL-Inter.txt.
+
+Koya and the separately installed Helix plugins are separate dependencies.

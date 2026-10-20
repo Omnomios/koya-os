@@ -1,0 +1,7 @@
+// The live session can run the installation worker without an admin prompt.
+// The UI remains a normal user application; the worker validates the request.
+polkit.addRule(function(action, subject) {
+    if (action.id === 'org.koya.installer.install' && subject.user === 'live' && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

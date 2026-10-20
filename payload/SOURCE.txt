@@ -1,0 +1,13 @@
+UI helpers and selected assets originally adapted from koya-bar revision: 72970d85a6be7b8c51172509e51b83b2079fccaa
+Commit: clean up assets
+
+Configuration reference versions below; these are not package pins.
+Koya, koya-shell and helix-plugins are fetched from the official repository at build/install time.
+hyprland 0.56.2-4
+hypridle 0.1.8-2
+linux 7.2.10.arch1-1
+plymouth 26.134.222-3
+upower 1.91.5-1
+accountsservice 26.27.3-1
+
+Greeter integration helpers in greeter/ are adapted from koya-bar (CC BY 4.0).

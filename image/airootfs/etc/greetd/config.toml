@@ -1,0 +1,11 @@
+[terminal]
+vt = 1
+switch = true
+
+[initial_session]
+command = "/usr/local/bin/koya-live-session"
+user = "live"
+
+[default_session]
+command = "/usr/bin/koya-greeter --raw-tty /dev/tty1"
+user = "root"

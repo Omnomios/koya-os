@@ -1,0 +1,10 @@
+[Unit]
+Description=Prepare the Koya live desktop account
+After=local-fs.target
+Before=greetd.service
+ConditionPathExists=/etc/koya-live
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/koya-live-setup
+RemainAfterExit=yes
