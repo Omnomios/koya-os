@@ -1,5 +1,9 @@
 # Koya Shell Live
 
+<p align="center">
+  <img src="docs/screenshots/desktop.jpg" alt="Koya Shell on Hyprland with the network popover open">
+</p>
+
 [Koya Shell](https://github.com/Omnomios/koya-bar), a desktop shell built on
 Koya, for Hyprland and Arch, on a USB stick. Boot it and you're on the full
 desktop, running from the stick. Nothing on the computer is touched, and
