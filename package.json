@@ -3,5 +3,5 @@
   "private": true,
   "type": "module",
   "license": "CC-BY-4.0",
-  "scripts": { "test": "node tests/model.mjs && node tests/brand.mjs && node tests/timezones.mjs && node tests/backend.mjs && node tests/image.mjs && node tests/release.mjs" }
+  "scripts": { "test": "node tests/model.mjs && node tests/brand.mjs && node tests/timezones.mjs && node tests/backend.mjs && node tests/image.mjs && node tests/framework-dbus.mjs && node tests/release.mjs" }
 }

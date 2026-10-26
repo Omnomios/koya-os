@@ -25,6 +25,7 @@ upower
 power-profiles-daemon
 brightnessctl
 adw-gtk-theme
+framework-dbus
 noto-fonts
 noto-fonts-cjk
 ttf-hack

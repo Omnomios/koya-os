@@ -2,7 +2,7 @@ UI helpers and selected assets originally adapted from koya-bar revision: 72970d
 Commit: clean up assets
 
 Configuration reference versions below; these are not package pins.
-Koya, koya-shell and helix-plugins are fetched from the official repository at build/install time.
+Koya, koya-shell, helix-plugins and framework-dbus are fetched from the official repository at build/install time.
 hyprland 0.56.2-4
 hypridle 0.1.8-2
 linux 7.2.10.arch1-1

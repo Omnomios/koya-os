@@ -14,6 +14,7 @@ packages_step() {
   mapfile -t chosen < <(jq -r --argjson selected "$apps" '.[] | select(.id as $id | $selected | index($id)) | .packages[]' "$root/backend/optional-apps.json")
   packages+=("${chosen[@]}")
   sed "s|@MIRRORLIST@|$payload/mirrorlist|" "$payload/pacman.conf.in" > "$work/pacman.conf"
+  cat "$payload/koya-repository.conf" >> "$work/pacman.conf"
   # The live image has a temporary overlay. Keep downloads on the destination
   # disk using pacstrap's default target cache, rather than consuming live RAM.
   pacstrap -K -M -C "$work/pacman.conf" "$mnt" "${packages[@]}"
@@ -26,5 +27,5 @@ packages_step() {
   arch-chroot "$mnt" pacman-key --add /var/lib/koya-installer/koya-packages.pub
   arch-chroot "$mnt" pacman-key --lsign-key 06089A97B6D66C69BFD021F0DF7B60698EF57FF3
   arch-chroot "$mnt" pacman -Syu --noconfirm --needed koya/koya-shell
-  arch-chroot "$mnt" pacman -Q koya koya-shell helix-plugins > "$mnt/var/lib/koya-installer/desktop-packages"
+  arch-chroot "$mnt" pacman -Q koya koya-shell helix-plugins framework-dbus > "$mnt/var/lib/koya-installer/desktop-packages"
 }

@@ -43,6 +43,7 @@ ttf-hack
 koya
 koya-shell
 helix-plugins
+framework-dbus
 # Networking, sound and desktop integration
 bluez
 bluez-utils
