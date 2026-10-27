@@ -524,8 +524,8 @@ export async function installer() {
     }));
     // Create only new rows. Their handler reads the current network record,
     // because NetworkManager replaces record objects on every refresh.
-    for (const network of list) {
-      if (connect.rows.has(network.key)) continue;
+    const created = await Promise.all(list.map(async (network, index) => {
+      if (connect.rows.has(network.key)) return null;
       const entry = { network, snapshot: {} };
       entry.id = await row(win, null, mainWidth(), ROW + 8, () => serial(async () => {
         const current = entry.network;
@@ -539,10 +539,16 @@ export async function installer() {
       const words = await lines(entry.id, network.name, security(network), mainWidth() - 12 - 8 - 28 - 12,
         network.supported ? [TEXT.primary, network.connected ? TEXT.accent : TEXT.secondary] : [TEXT.disabled, TEXT.disabled]);
       entry.heading = words.heading; entry.caption = words.caption;
-      await Promise.all([UI.setElementId(win, entry.id, 'installer-network-' + network.name), UI.attach(win, connect.list, entry.id)]);
+      await Promise.all([UI.setElementId(win, entry.id, 'installer-network-' + network.name),
+        UI.setLayoutOrder(win, entry.id, index * 2 + 1)]);
       entry.snapshot = { name: network.name, signal: signal(network), security: security(network),
-        supported: network.supported, connected: network.connected, selected: chosen?.key === network.key, index: -1 };
-      connect.rows.set(network.key, entry);
+        supported: network.supported, connected: network.connected, selected: chosen?.key === network.key, index };
+      return { key: network.key, entry };
+    }));
+    for (const built of created) {
+      if (!built) continue;
+      await UI.attach(win, connect.list, built.entry.id);
+      connect.rows.set(built.key, built.entry);
     }
     await Promise.all(list.map(async (network, index) => {
       const entry = connect.rows.get(network.key), prior = entry.snapshot;

@@ -57,7 +57,7 @@ export default function main(){setTimeout(async()=>{
   assert(await networkRow()===retainedRow,'Changed network attributes retain the Koya Studio native row');
   const library=await UI.getElementById(app.win,'installer-network-Library');
   assert(library,'Changed scan adds Library');
-  assert(!await UI.getElementById(app.win,'installer-network-Café Wi-Fi').catch(()=>null),'Changed scan removes Café Wi-Fi');
+  assert(await UI.getElementById(app.win,'installer-network-Café Wi-Fi')===-1,'Changed scan removes Café Wi-Fi');
   const [libraryFrame,studioFrame]=await Promise.all([UI.getElementFrame(app.win,library),UI.getElementFrame(app.win,retainedRow)]);
   assert(libraryFrame.min.y<studioFrame.min.y,'Changed scan reorders rows by strength');
   await ui.choose('Koya Studio');
