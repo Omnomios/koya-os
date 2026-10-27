@@ -862,6 +862,9 @@ export async function installer() {
     timezone: () => serial(openPicker),
     choose: name => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = ''; await reconcileConnect(); }),
     connect: (name, password) => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = password || ''; await joinChosen(); }),
+    setWifiPassword: value => serial(async () => { wifiPassword = value; await view.connect?.selection?.input?.setValue(value); }),
+    wifiPasswordMatches: value => !!view.connect?.selection?.input && wifiPassword === value && view.connect.selection.input.getValue() === value,
+    joinSelected: () => serial(joinChosen),
     networks: items => wifi.setNetworks(items),
     fill: values => { Object.assign(config, values.config || {}); Object.assign(secrets, values.secrets || {}); },
     state: () => ({ page, installing, done, failed, error, scanning: wifi?.state?.scanning }), window: win
