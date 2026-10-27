@@ -44,6 +44,25 @@ try {
   const liveHypr = fs.readFileSync(live + '/etc/skel/.config/hypr/live.lua', 'utf8');
   assert.match(liveHypr, /hl\.exec_cmd\("\/usr\/local\/bin\/koya-installer"\)/);
   assert.doesNotMatch(liveHypr, /float\s*=\s*true/);
+  const launcher = fs.readFileSync(live + '/usr/local/bin/koya-installer', 'utf8');
+  assert.match(launcher, /systemd-cat --identifier=koya-installer[\s\S]*flock --nonblock/);
+  assert.match(launcher, /KOYA_INSTALLER_BOOT_TRACE=1[\s\S]*\/opt\/koya-installer\/run\.sh --verbose ui,layout,wayland,vulkan/);
+  assert.doesNotMatch(liveHypr, /--verbose|KOYA_INSTALLER_BOOT_TRACE/);
+  const run = fs.readFileSync(app + '/run.sh', 'utf8');
+  assert.match(run, /--verbose\)/);
+  const installer = fs.readFileSync(app + '/apps/installer.js', 'utf8');
+  assert.match(installer, /!preview && Process\.getEnv\('KOYA_INSTALLER_BOOT_TRACE', ''\) === '1'/);
+  for (const phase of ['initial-render-sample', 'boot-timer-500ms-sample', 'resize-after-reflow-sample', 'resize-settled-sample']) {
+    assert(installer.includes(phase), `Missing live welcome boot phase: ${phase}`);
+  }
+  assert.match(installer, /WELCOME_BOOT_GEOMETRY/);
+  assert.match(installer, /WELCOME_BOOT_RESIZE_EVENT/);
+  for (const part of ['line-0', 'line-1', 'line-2', 'line-3', 'hero', 'panel', 'body-viewport', 'body-content', 'footer']) {
+    assert(installer.includes(`'${part}'`), `Missing welcome native frame: ${part}`);
+  }
+  assert.match(installer, /UI\.getElementFrame/);
+  assert.match(installer, /Compositor\.getWindowInfo/);
+  assert.match(installer, /fractionalScale/);
   assert(fs.existsSync(live + '/etc/skel/.local/share/koya-bar/wallpapers/catching-the-desert.jpeg'));
   assert.match(fs.readFileSync(live + '/usr/share/applications/koya-installer.desktop', 'utf8'), /Exec=\/usr\/local\/bin\/koya-installer/);
   assert.match(fs.readFileSync(live + '/usr/share/polkit-1/actions/org.koya.installer.policy', 'utf8'), /\/opt\/koya-installer\/backend\/install.sh/);

@@ -6,8 +6,9 @@ export KOYA_INSTALLER_PAYLOAD=${KOYA_INSTALLER_PAYLOAD:-$root/payload}
 export KOYA_INSTALLER_PREVIEW=0
 case ${1:-} in
   --preview) export KOYA_INSTALLER_PREVIEW=1; shift ;;
+  --verbose) ;;
   '') ;;
-  *) printf 'Usage: ./run.sh [--preview]\n' >&2; exit 2 ;;
+  *) printf 'Usage: ./run.sh [--preview | --verbose ui,layout,wayland,vulkan]\n' >&2; exit 2 ;;
 esac
 export KOYA_INSTALLER_SELF_TEST=0
 if [[ ${1:-} == --self-test && $KOYA_INSTALLER_PREVIEW == 1 ]]; then KOYA_INSTALLER_SELF_TEST=1; shift; fi

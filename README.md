@@ -71,6 +71,23 @@ Switch to another VT and log in as `root` with no password. SSH isn't enabled.
 - installer: `journalctl -t koya-installer`
 - wallpaper preparation: `/var/log/koya-live/wallpaper.log`
 
+On the diagnostic live ISO, photograph the faulty welcome screen before touching
+or resizing it. Perform the corrective resize, wait about one second, then press
+Escape to close the installer and flush its process output. Switch to another VT
+and run this command before rebooting (the live journal is volatile):
+
+```bash
+journalctl -b -t koya-installer -o short-precise --no-pager > /tmp/koya-installer-boot.log
+```
+
+`WELCOME_BOOT_RESIZE_EVENT` records each welcome resize as it arrives, with its
+sequence number, event dimensions, and canvas size before reflow.
+`WELCOME_BOOT_GEOMETRY` samples native geometry after the initial render, from
+a 500 ms timer, after reflow for the first eight welcome resizes, and 250 ms
+after the last resize event. Use each entry's phase, timestamp, and resize
+sequence to correlate samples; native queries can finish in a different order.
+Do not enter Wi-Fi or account passwords during this capture.
+
 ## Build the image
 
 On an up-to-date x86_64 Arch Linux machine, as root:

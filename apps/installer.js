@@ -3,6 +3,7 @@ import * as Image from 'Koya/Image';
 import * as Engine from 'Helix/Engine';
 import * as Event from 'Helix/Event';
 import * as Log from 'Helix/Log';
+import * as Process from 'Module/process';
 import * as UI from '/rom/apps/theme-ui.js';
 import { text, label, icon, row, pill, toggle, throbber, button } from '/rom/apps/touch-ui.js';
 import { textInput } from '/rom/apps/text-input.js';
@@ -58,6 +59,7 @@ const security = network => network.connected ? 'Connected' : !network.supported
 
 export async function installer() {
   const api = backend(), config = initialConfig(), secrets = emptySecrets();
+  const bootTrace = !preview && Process.getEnv('KOYA_INSTALLER_BOOT_TRACE', '') === '1';
   let page = 'welcome', error = '', disks = [], online = false, installing = false, done = false, failed = false, showLog = false;
   let networks = { networks: [], loading: true }, chosen, wifiPassword = '', wifi, currentStage = '', log = '';
   // The timezone picker opens over the account page.
@@ -67,6 +69,7 @@ export async function installer() {
   if (!displays.length) throw new Error('No Wayland display');
   const display = displays[0];
   let size = { x: Math.min(960, Number(display.logical_width || display.width)), y: Math.min(780, Number(display.logical_height || display.height)) };
+  const requestedSize = { ...size };
   const win = await Compositor.createWindow({ role: 'window', title: 'Koya Installer' + (preview ? ' — Preview' : ''), appId: 'koya-installer',
     size, msaaSamples: 4, acceptPointerEvents: true });
   // Use the engine's logical canvas for layout; it scales rendering and input.
@@ -172,7 +175,8 @@ export async function installer() {
     await UI.attach(win, root, wall); await UI.attach(win, root, centre);
     await UI.attachRoot(win, root);
     play(shaded, presets.rise(0, 0.05));
-    view = { title, heroHost, bodyHost, status, back, next, backLabel, nextLabel, nextFeedback, steps, welcome: page === 'welcome', shownPage: -1, ready: undefined };
+    view = { title, heroHost, bodyHost, status, footer, panel: surface.id, back, next, backLabel, nextLabel, nextFeedback, steps,
+      welcome: page === 'welcome', shownPage: -1, ready: undefined, welcomeLines: [] };
   };
 
   // ---- Shared page parts ---------------------------------------------------
@@ -294,11 +298,16 @@ export async function installer() {
       const copyHeight = 24 + 3 * 18 + 3 * SPACE.s;
       const lead = Math.max(0, Math.round((bodyHeight() - copyHeight) / 2 - SPACE.s));
       await add(await UI.createElement(win, { item: { size: { x: mainWidth(), y: lead } } }), lead);
-      await add(await centred('A desktop shell built on Koya, for Hyprland and Arch.', TYPE.heading, 24, TEXT.primary), 24);
+      const welcomeLine = async (value, size, height, colour) => {
+        const id = await centred(value, size, height, colour);
+        if (bootTrace) view.welcomeLines.push(id);
+        return id;
+      };
+      await add(await welcomeLine('A desktop shell built on Koya, for Hyprland and Arch.', TYPE.heading, 24, TEXT.primary), 24);
       for (const line of ['One shell from the login screen to the lock screen, with one theme across all of it.',
         'The visual polish of a web stack without the cruft. There’s no browser underneath;',
         'Koya draws it on the GPU in around 48 MB of memory.'])
-        await add(await centred(line, TYPE.body, 18, TEXT.secondary), 18 - SPACE.s);
+        await add(await welcomeLine(line, TYPE.body, 18, TEXT.secondary), 18 - SPACE.s);
     },
     // Connect: the connection, then Wi-Fi networks; a chosen secured one asks for its password in place.
     connect: async () => {
@@ -819,20 +828,77 @@ export async function installer() {
     for (const input of inputs) await input.destroy();
     Object.assign(secrets, emptySecrets()); await destroySurface(win); Engine.quit();
   };
+  // Only the live boot launcher enables this. Keep the journal sample to fixed
+  // geometry fields and known welcome elements; never log UI text or inputs.
+  const geometryFields = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
+  const traceBoot = async (phase, event, reflowed, sequence) => {
+    if (!bootTrace || closed || page !== 'welcome') return;
+    try {
+      const time = Date.now();
+      const canvas = { ...size };
+      const parts = [
+        ['line-0', view.welcomeLines?.[0]], ['line-1', view.welcomeLines?.[1]],
+        ['line-2', view.welcomeLines?.[2]], ['line-3', view.welcomeLines?.[3]],
+        ['hero', view.hero], ['panel', view.panel], ['body-viewport', body?.id],
+        ['body-content', body?.content], ['footer', view.footer]
+      ].filter(([, id]) => id !== undefined);
+      const [windowResult, ...frameResults] = await Promise.allSettled([
+        Compositor.getWindowInfo(win), ...parts.map(([, id]) => UI.getElementFrame(win, id))
+      ]);
+      const window = windowResult.status === 'fulfilled' ? windowResult.value : null;
+      Log.info('WELCOME_BOOT_GEOMETRY: ' + JSON.stringify({
+        phase, time,
+        display: geometryFields(display, ['width', 'height', 'logical_width', 'logical_height', 'scale']),
+        requested: requestedSize,
+        window: geometryFields(window, ['width', 'height', 'bufferScale', 'fractionalScale']),
+        canvas,
+        ...(event ? { resizeEvent: geometryFields(event, ['width', 'height']) } : {}),
+        ...(sequence !== undefined ? { resizeSequence: sequence } : {}),
+        ...(reflowed !== undefined ? { reflowed } : {}),
+        frames: Object.fromEntries(parts.map(([name], index) => [name,
+          frameResults[index].status === 'fulfilled' ? frameResults[index].value : null]))
+      }));
+    } catch {
+      Log.info('WELCOME_BOOT_TRACE_ERROR: ' + phase);
+    }
+  };
+  let resizeTraceCount = 0, settledResizeTimer;
   Event.on('windowClosed', event => { if (event.id !== win) return; closed = true; wifi?.dispose(); Object.assign(secrets, emptySecrets()); Engine.quit(); });
   // Escape leaves the timezone picker first, then the installer.
   Event.on('keyDown', event => { if (event.id === win && [1, 65307].includes(Number(event.key)) && !installing) serial(picking ? goBack : close); });
   Event.on('windowResized', event => {
     if (event.id !== win || closed) return;
+    const welcomeResize = bootTrace && page === 'welcome';
+    const sequence = welcomeResize ? ++resizeTraceCount : undefined;
+    const traceResize = welcomeResize && sequence <= 8;
+    if (welcomeResize) {
+      Log.info('WELCOME_BOOT_RESIZE_EVENT: ' + JSON.stringify({
+        time: Date.now(), resizeSequence: sequence,
+        resizeEvent: geometryFields(event, ['width', 'height']), canvas: { ...size }
+      }));
+      clearTimeout(settledResizeTimer);
+      settledResizeTimer = setTimeout(() => {
+        serial(async () => {
+          if (sequence === resizeTraceCount) void traceBoot('resize-settled-sample', event, undefined, sequence);
+        });
+      }, 250);
+    }
     serial(async () => {
       const next = await canvasSize();
-      if (next.x === size.x && next.y === size.y) return;
-      size = next; await buildChrome(); view.shownPage = -1; await render();
+      const reflowed = next.x !== size.x || next.y !== size.y;
+      if (reflowed) {
+        size = next; await buildChrome(); view.shownPage = -1; await render();
+      }
+      if (traceResize) void traceBoot('resize-after-reflow-sample', event, reflowed, sequence);
     });
   });
 
   await buildChrome();
   await render();
+  if (bootTrace) {
+    void traceBoot('initial-render-sample');
+    setTimeout(() => { void traceBoot('boot-timer-500ms-sample'); }, 500);
+  }
   Log.info('Installer view ready');
   // Reconcile published scan and connection state without replacing the page.
   const onNetworks = value => {
