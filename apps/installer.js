@@ -458,7 +458,14 @@ export async function installer() {
   const reconcileConnect = async () => {
     const connect = view.connect;
     if (closed || page !== 'connect' || !connect) return;
-    const list = networks.networks || [], wired = networks.available === false && !networks.loading;
+    const published = networks.networks || [], wired = networks.available === false && !networks.loading;
+    const scanning = !!(wifi?.state?.scanning || networks.loading);
+    // A scan can briefly omit APs before its final publication. Keep their
+    // existing rows and selection until the scan finishes or the device goes.
+    const publishedKeys = new Set(published.map(network => network.key));
+    const list = scanning && !wired
+      ? published.concat([...connect.rows].filter(([key]) => !publishedKeys.has(key)).map(([, entry]) => entry.network))
+      : published;
     const connected = list.find(network => network.connected);
     const glyph = connected ? signal(connected) : '/rom/assets/status/' + (online ? 'ethernet' : 'wifi-off') + '.png';
     const heading = online ? 'Online' : 'Offline';
@@ -471,7 +478,6 @@ export async function installer() {
       connect.online = online;
       jobs.push(connect.title.setDot(online ? 'good' : 'warn'));
     }
-    const scanning = !!(wifi?.state?.scanning || networks.loading);
     if (connect.scanning !== scanning) { connect.scanning = scanning; jobs.push(connect.head.setBusy(scanning)); }
     if (connect.wired !== wired) {
       connect.wired = wired;
@@ -545,11 +551,10 @@ export async function installer() {
         supported: network.supported, connected: network.connected, selected: chosen?.key === network.key, index };
       return { key: network.key, entry };
     }));
-    for (const built of created) {
-      if (!built) continue;
+    await Promise.all(created.filter(Boolean).map(async built => {
       await UI.attach(win, connect.list, built.entry.id);
       connect.rows.set(built.key, built.entry);
-    }
+    }));
     await Promise.all(list.map(async (network, index) => {
       const entry = connect.rows.get(network.key), prior = entry.snapshot;
       entry.network = network;
@@ -758,10 +763,13 @@ export async function installer() {
   const checkConnection = async () => { online = (await api.connection()).online; };
   const joinChosen = async () => {
     if (!chosen) return;
-    view.connectFeedback?.begin();
-    const accepted = await wifi.connect(chosen, chosen.password ? wifiPassword : undefined);
-    wifiPassword = '';
-    if (accepted) { chosen = undefined; error = ''; await checkConnection(); }
+    const feedback = view.connectFeedback;
+    let accepted;
+    try {
+      await feedback?.begin();
+      accepted = await wifi.connect(chosen, chosen.password ? wifiPassword : undefined);
+    } finally { await feedback?.end(); }
+    if (accepted) { chosen = undefined; wifiPassword = ''; error = ''; await checkConnection(); }
     else { error = wifi.state.error || 'Could not connect'; play(view.status, presets.shake()); }
     await reconcileConnect();
   };
