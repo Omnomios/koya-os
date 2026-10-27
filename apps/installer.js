@@ -893,8 +893,9 @@ export async function installer() {
     });
   });
 
-  await buildChrome();
-  await render();
+  const initialRender = rendering.then(async () => { await buildChrome(); await render(); });
+  rendering = initialRender.catch(() => {});
+  await initialRender;
   if (bootTrace) {
     void traceBoot('initial-render-sample');
     setTimeout(() => { void traceBoot('boot-timer-500ms-sample'); }, 500);

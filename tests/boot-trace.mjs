@@ -32,7 +32,7 @@ assert.doesNotMatch(installer, /Compositor\.resizeWindow/);
 // a long drag. Framework modules are unavailable to Node, so only the handler
 // is evaluated with its geometry and timer dependencies stubbed.
 const handlerStart = installer.search(/  let (?:firstResizeTraced|resizeTraceCount) = /);
-const handlerEnd = installer.indexOf('\n  await buildChrome();', handlerStart);
+const handlerEnd = handlerStart + installer.slice(handlerStart).search(/\n  (?:await (?:buildChrome\(\)|serial\()|const initialRender = rendering\.then\()/);
 assert(handlerStart >= 0 && handlerEnd > handlerStart, 'Welcome resize handler is present');
 const handlers = new Map(), traces = [], timers = new Map(), eventLogs = [];
 let timerId = 0;
@@ -89,6 +89,67 @@ for (const callback of timers.values()) callback();
 await work;
 assert(traces.some(trace => trace.phase === 'resize-settled-sample' && trace.width === 912 && trace.sequence === 12),
   'Trailing sample must include the final resize after a long drag');
+
+// Run the registered startup path while its first native render is pending.
+// A configure at that point must wait for startup's render to finish.
+const startupEnd = installer.indexOf("\n  Log.info('Installer view ready');", handlerEnd);
+assert(startupEnd > handlerEnd, 'Welcome startup sequence is present');
+const serialStart = installer.indexOf('  const serial = job => ');
+const serialSource = installer.slice(serialStart, installer.indexOf('\n', serialStart));
+assert(serialStart >= 0 && serialSource.includes('rendering.then(job).catch('), 'Production serial contract is present');
+const runStartup = context => vm.runInNewContext(`(async () => {
+  let rendering = Promise.resolve(), error = '';
+  const paintStatus = async () => {};
+  ${serialSource}
+  globalThis.installerQueue = () => rendering;
+  ${installer.slice(handlerStart, startupEnd)}
+})()`, context);
+const startupHandlers = new Map(), bodies = [];
+let releaseNative, nativeEntered;
+const nativeGate = new Promise(resolve => { releaseNative = resolve; });
+const enteredNative = new Promise(resolve => { nativeEntered = resolve; });
+let activeRenders = 0, overlappingRenders = false, canvas = { x: 960, y: 780 };
+let renderCalls = 0;
+const startupContext = {
+  Event: { on: (name, handler) => startupHandlers.set(name, handler) },
+  win: 1, closed: false, page: 'welcome', bootTrace: false,
+  wifi: null, secrets: {}, emptySecrets: () => ({}), Engine: { quit() {} },
+  picking: false, goBack() {}, close() {},
+  canvasSize: async () => canvas,
+  size: { x: 960, y: 780 }, view: { shownPage: -1 },
+  buildChrome: async () => { bodies.length = 0; },
+  render: async () => {
+    if (++activeRenders > 1) overlappingRenders = true;
+    if (++renderCalls === 1) { nativeEntered(); await nativeGate; }
+    bodies.push('installer-body');
+    activeRenders--;
+  },
+  setTimeout: () => 1, clearTimeout() {}, Log: { info() {} }
+};
+const startup = runStartup(startupContext);
+await enteredNative;
+canvas = { x: 900, y: 740 };
+startupHandlers.get('windowResized')({ id: 1, width: 900, height: 740 });
+await new Promise(resolve => setImmediate(resolve));
+const rendersBeforeRelease = renderCalls;
+releaseNative();
+await startup;
+await startupContext.installerQueue();
+assert.equal(rendersBeforeRelease, 1, 'Early resize waits while the initial native render is pending');
+assert.equal(renderCalls, 2, 'Early resize reflows once after startup');
+assert.equal(overlappingRenders, false, 'Early resize must not overlap initial native render');
+assert.equal(bodies.length, 1, 'Early resize must leave one installer body');
+for (const failedStep of ['buildChrome', 'render']) {
+  const failure = new Error(`Initial ${failedStep} failed`);
+  const failedContext = {
+    ...startupContext,
+    Event: { on() {} },
+    buildChrome: async () => {}, render: async () => {},
+    [failedStep]: async () => { throw failure; }
+  };
+  await assert.rejects(runStartup(failedContext), reason => reason === failure,
+    `Initial ${failedStep} failure must reject the startup call`);
+}
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'koya-boot-trace-'));
 try {
   const assets = path.join(temp, 'assets');
