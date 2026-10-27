@@ -31,6 +31,17 @@ export default function main(){setTimeout(async()=>{
     return;
   }
   await ui.next();assert(at('connect'),'Install starts the wizard');
+  const networkRow=()=>UI.getElementById(app.win,'installer-network-Koya Studio').catch(()=>null);
+  let retainedRow;
+  for(let i=0;i<20&&!retainedRow;i++){retainedRow=await networkRow();if(!retainedRow)await wait(50);}
+  assert(retainedRow,'Koya Studio network row appears on Get connected');
+  await ui.scan();await ui.idle();
+  assert(ui.state().scanning,'Mock Wi-Fi scan is in progress');
+  assert(await networkRow()===retainedRow,'Scan must retain the Koya Studio native row while scanning');
+  for(let i=0;i<20&&ui.state().scanning;i++)await wait(100);
+  assert(!ui.state().scanning,'Mock Wi-Fi scan completes');
+  await ui.idle();
+  assert(await networkRow()===retainedRow,'Scan must retain the Koya Studio native row after completion');
   await ui.back();assert(at('welcome'),'Back returns to the welcome screen');
   await ui.next();assert(at('connect'),'The wizard can be reopened from welcome');
   await wait(250);await ui.next();assert(at('connect')&&ui.state().error,'Offline blocks continuing');

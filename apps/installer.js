@@ -722,12 +722,13 @@ export async function installer() {
   // Preview automation exposes actions, never entered passwords.
   if (preview) globalThis.koyaInstallerPreview = {
     next: () => serial(goNext), back: () => serial(goBack),
+    scan: () => wifi.scan(), idle: () => rendering,
     selectDisk: path => { const disk = disks.find(item => item.path === path); if (disk && !disk.reason) { config.disk = path; config.diskKey = disk.key; } },
     timezone: () => serial(openPicker),
     choose: name => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = ''; await render(); }),
     connect: (name, password) => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = password || ''; await joinChosen(); }),
     fill: values => { Object.assign(config, values.config || {}); Object.assign(secrets, values.secrets || {}); },
-    state: () => ({ page, installing, done, failed, error }), window: win
+    state: () => ({ page, installing, done, failed, error, scanning: wifi?.state?.scanning }), window: win
   };
   return { win, close };
 }
