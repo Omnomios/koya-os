@@ -35,13 +35,40 @@ export default function main(){setTimeout(async()=>{
   let retainedRow;
   for(let i=0;i<20&&!retainedRow;i++){retainedRow=await networkRow();if(!retainedRow)await wait(50);}
   assert(retainedRow,'Koya Studio network row appears on Get connected');
+  const body=await UI.getElementById(app.win,'installer-body');
+  const scanButton=await UI.getElementById(app.win,'installer-scan');
   await ui.scan();await ui.idle();
   assert(ui.state().scanning,'Mock Wi-Fi scan is in progress');
   assert(await networkRow()===retainedRow,'Scan must retain the Koya Studio native row while scanning');
+  assert(await UI.getElementById(app.win,'installer-body')===body&&await UI.getElementById(app.win,'installer-scan')===scanButton,
+    'Scan must retain the connect body and header');
   for(let i=0;i<20&&ui.state().scanning;i++)await wait(100);
   assert(!ui.state().scanning,'Mock Wi-Fi scan completes');
   await ui.idle();
   assert(await networkRow()===retainedRow,'Scan must retain the Koya Studio native row after completion');
+  assert(await UI.getElementById(app.win,'installer-body')===body,'Scan completion retains the connect body');
+  ui.networks([
+    { name: 'Library', Strength: 99, security: 'open' },
+    { name: 'Koya Studio', Strength: 72, security: 'wpa-psk' },
+    { name: 'Office', Strength: 38, security: 'sae' },
+    { name: 'eduroam', Strength: 30, security: 'enterprise' }
+  ]);
+  await ui.idle();
+  assert(await networkRow()===retainedRow,'Changed network attributes retain the Koya Studio native row');
+  const library=await UI.getElementById(app.win,'installer-network-Library');
+  assert(library,'Changed scan adds Library');
+  assert(!await UI.getElementById(app.win,'installer-network-Café Wi-Fi').catch(()=>null),'Changed scan removes Café Wi-Fi');
+  const [libraryFrame,studioFrame]=await Promise.all([UI.getElementFrame(app.win,library),UI.getElementFrame(app.win,retainedRow)]);
+  assert(libraryFrame.min.y<studioFrame.min.y,'Changed scan reorders rows by strength');
+  await ui.choose('Koya Studio');
+  const password=await UI.getElementById(app.win,'installer-wifi-password');
+  await ui.scan();await ui.idle();
+  assert(await UI.getElementById(app.win,'installer-wifi-password')===password,'Scan retains the selected password field');
+  assert(await networkRow()===retainedRow,'Scan retains the selected network row');
+  for(let i=0;i<20&&ui.state().scanning;i++)await wait(100);
+  await ui.idle();
+  assert(!ui.state().scanning,'Selected network scan completes');
+  assert(await UI.getElementById(app.win,'installer-wifi-password')===password,'Completed scan retains the selected password field');
   await ui.back();assert(at('welcome'),'Back returns to the welcome screen');
   await ui.next();assert(at('connect'),'The wizard can be reopened from welcome');
   await wait(250);await ui.next();assert(at('connect')&&ui.state().error,'Offline blocks continuing');

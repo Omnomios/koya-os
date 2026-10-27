@@ -33,11 +33,12 @@ export function hoverable(win, target, cursor = 'pointer', hover, rest = CLEAR) 
   let inside = false;
   return event => {
     pointer(event);
-    if (!hover || event.source === 'touch') return;
+    const hoverColour = typeof hover === 'function' ? hover() : hover;
+    if (!hoverColour || event.source === 'touch') return;
     const next = event.phase !== 'leave';
     if (next === inside) return;
     inside = next;
-    UI.setBoxColour(win, target(), next ? hover : rest).catch(() => {});
+    UI.setBoxColour(win, target(), next ? hoverColour : typeof rest === 'function' ? rest() : rest).catch(() => {});
   };
 }
 
@@ -159,8 +160,9 @@ export async function sheetHeader(win, parent, title, width, actions = [], acces
 // onPress/onRelease let callers add secondary motion (a chevron nudge).
 export async function row(win, parent, width, height, handler, options = {}) {
   let motion;
+  const colour = () => typeof options.colour === 'function' ? options.colour() : options.colour || SURFACE.card;
   const id = await UI.createElement(win, {
-    renderable: { type: 'box', colour: options.colour || SURFACE.card, cornerRadius: options.radius ?? RADIUS.surface, cornerResolution: 16, origin: { x: 0.5, y: 0.5 } },
+    renderable: { type: 'box', colour: colour(), cornerRadius: options.radius ?? RADIUS.surface, cornerResolution: 16, origin: { x: 0.5, y: 0.5 } },
     layout: { type: 'row', alignItems: 'center', gap: options.gap ?? 12, padding: { l: 12, r: options.right ?? 8, t: 0, b: 0 } },
     item: { size: { x: width, y: height } }, contentAlign: 'fill', inheritAnimation: true,
     onPress: pressFeedback({
@@ -170,7 +172,7 @@ export async function row(win, parent, width, height, handler, options = {}) {
     }),
     // Rows lift on hover: a filled hover surface over a card, a soft tint over a clear row.
     onActivate: handler, onHover: hoverable(win, () => id, options.cursor || 'pointer',
-      options.hover === undefined ? ((options.colour || SURFACE.card) === SURFACE.card ? SURFACE.rowHover : HIGHLIGHT.hover) : options.hover, options.colour || SURFACE.card)
+      () => options.hover === undefined ? (colour() === SURFACE.card ? SURFACE.rowHover : HIGHLIGHT.hover) : options.hover, colour)
   });
   // Press frames also restore opacity and offset, so tapping a row during its
   // entrance cannot leave it half-faded or displaced.

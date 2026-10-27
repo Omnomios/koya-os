@@ -111,7 +111,7 @@ export function mockBackend() {
 // NetworkManager as wifi-network.js presents it: the same state shape,
 // start/scan/connect/toggle/dispose.
 export function mockWifi(changed = () => {}, backend) {
-  const fixtures = [
+  let fixtures = [
     { name: 'Koya Studio', Strength: 92, security: 'wpa-psk' },
     { name: 'Café Wi-Fi', Strength: 64, security: 'open' },
     { name: 'Office', Strength: 38, security: 'sae' },
@@ -138,6 +138,13 @@ export function mockWifi(changed = () => {}, backend) {
       if (state.scanning) return;
       publish({ scanning: true, error: '', message: '' });
       later(1200, () => publish({ scanning: false, networks: list(connected) }));
+    },
+    // Desktop preview can publish a changed scan result without touching NM.
+    setNetworks: items => {
+      fixtures = items.map(item => ({ ...item, key: item.name + ':' + item.security,
+        ssid: [...item.name].map(c => c.charCodeAt(0)), password: ['wpa-psk', 'sae'].includes(item.security),
+        supported: item.security !== 'enterprise', connected: false, saved: false }));
+      publish({ loading: false, networks: list(connected) });
     },
     connect: async (network, password) => {
       publish({ working: true, error: '', message: '' });

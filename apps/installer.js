@@ -303,56 +303,17 @@ export async function installer() {
     // Connect: the connection, then Wi-Fi networks; a chosen secured one asks for its password in place.
     connect: async () => {
       const hero = await placeHero();
-      const connected = networks.networks?.find(network => network.connected);
-      // No Wi-Fi device (or no NetworkManager): a cable is the only way online.
-      const wired = networks.available === false && !networks.loading;
-      const badge = await kit.badge({ glyph: connected ? signal(connected) : '/rom/assets/status/' + (online ? 'ethernet' : 'wifi-off') + '.png', health: online ? 'good' : 'warn' });
-      const title = await kit.titleBlock({ title: online ? 'Online' : 'Offline', subtitle: online ? (connected ? connected.name : 'Wired connection') : wired ? 'No Wi-Fi device' : 'Join a network to continue', dot: online ? 'good' : 'warn' });
+      const badge = await kit.badge({ glyph: '/rom/assets/status/wifi-off.png', health: 'warn' });
+      const title = await kit.titleBlock({ title: 'Offline', subtitle: 'Join a network to continue', dot: 'warn' });
       await UI.attach(win, hero, badge.id); await UI.attach(win, hero, title.id);
-      badge.pop(); badge.pulse(!!wifi?.state?.working);
-      if (wired) {
-        if (!online) { const empty = await kit.emptyState({ glyph: '/rom/assets/status/ethernet.png', message: 'Connect a network cable', width: mainWidth(), height: 96 }); await add(empty.id, 96); }
-        if (networks.error) error = networks.error;
-        return;
-      }
-      const scanning = wifi?.state?.scanning || networks.loading;
-      const head = await header('Wi-Fi', { label: 'Scan', id: 'installer-scan', onActivate: () => serial(async () => { await wifi?.scan(); }) });
-      if (scanning) await head.setBusy(true);
-      if (networks.enabled === false) {
-        const host = await card(1, ROW + 8);
-        await option(host, 'Wi-Fi', networks.hardware === false ? 'Blocked by the device' : 'Off', false, () => { serial(async () => { await wifi?.toggle(); }); return true; }, 'installer-wifi-power');
-      }
-      for (const network of networks.networks || []) {
-        const selected = chosen?.key === network.key;
-        const target = await row(win, null, mainWidth(), ROW + 8, () => serial(async () => {
-          if (!network.supported || network.connected) return;
-          chosen = selected ? undefined : network; wifiPassword = ''; await render();
-        }), { colour: selected ? SURFACE.selected : SURFACE.card, cursor: network.supported && !network.connected ? 'pointer' : 'default' });
-        await icon(win, target, signal(network), 20, 28, ROW + 8);
-        await lines(target, network.name, security(network), mainWidth() - 12 - 8 - 28 - 12, network.supported ? [TEXT.primary, network.connected ? TEXT.accent : TEXT.secondary] : [TEXT.disabled, TEXT.disabled]);
-        await UI.setElementId(win, target, 'installer-network-' + network.name);
-        await add(target, ROW + 8);
-        if (selected) {
-          const host = await card(network.password ? 2 : 1);
-          // Enter connects, as the Connect button does.
-          if (network.password) {
-            const input = await field(host, 'Password', wifiPassword, value => { wifiPassword = value; }, { password: true, id: 'installer-wifi-password',
-              submit: () => serial(joinChosen) });
-            await input.focus();
-          }
-          const actions = await UI.createElement(win, { layout: { type: 'row', justifyContent: 'end', alignItems: 'center' }, item: { size: { x: 'auto', y: ROW } } });
-          const connect = await pill(win, null, 'Connect', ACTION, () => serial(joinChosen), { colour: SURFACE.accent, labelColour: TEXT.onAccent, height: 34,
-            onFeedback: value => { view.connectFeedback = value; } });
-          await Promise.all([UI.attach(win, actions, connect), UI.setElementId(win, connect, 'installer-connect')]);
-          await UI.attach(win, host, actions);
-          if (wifi?.state?.working) view.connectFeedback?.begin();
-        }
-      }
-      if (!(networks.networks || []).length && !scanning && networks.enabled !== false) {
-        const empty = await kit.emptyState({ glyph: '/rom/assets/status/wifi-off.png', message: 'No networks', width: mainWidth(), height: 96 });
-        await add(empty.id, 96);
-      }
-      if (networks.error) error = networks.error;
+      badge.pop();
+      const head = await header('Wi-Fi', { label: 'Scan', id: 'installer-scan', onActivate: () => wifi?.scan().catch(reason => {
+        error = reason?.message || String(reason); serial(paintStatus);
+      }) });
+      const list = await UI.createElement(win, { layout: { type: 'column', gap: SPACE.s }, item: { size: { x: mainWidth(), y: 0 } } });
+      await add(list, 0);
+      view.connect = { badge, title, head, list, rows: new Map(), height: 0 };
+      await reconcileConnect();
     },
     // Disk: every disk; those that cannot be used say why and do not respond.
     disk: async () => {
@@ -492,6 +453,172 @@ export async function installer() {
     }
   };
 
+  // The connect page owns its native elements until navigation or resize.
+  // NetworkManager publishes frequently, including unchanged lists during a scan.
+  const reconcileConnect = async () => {
+    const connect = view.connect;
+    if (closed || page !== 'connect' || !connect) return;
+    const list = networks.networks || [], wired = networks.available === false && !networks.loading;
+    const connected = list.find(network => network.connected);
+    const glyph = connected ? signal(connected) : '/rom/assets/status/' + (online ? 'ethernet' : 'wifi-off') + '.png';
+    const heading = online ? 'Online' : 'Offline';
+    const subtitle = online ? (connected ? connected.name : 'Wired connection') : wired ? 'No Wi-Fi device' : 'Join a network to continue';
+    const jobs = [];
+    if (connect.glyph !== glyph) { connect.glyph = glyph; jobs.push(connect.badge.setGlyph(glyph)); }
+    if (connect.heading !== heading) { connect.heading = heading; jobs.push(UI.setTextString(win, connect.title.heading, heading)); }
+    if (connect.subtitle !== subtitle) { connect.subtitle = subtitle; jobs.push(UI.setTextString(win, connect.title.caption, subtitle)); }
+    if (connect.online !== online) {
+      connect.online = online;
+      jobs.push(connect.title.setDot(online ? 'good' : 'warn'));
+    }
+    const scanning = !!(wifi?.state?.scanning || networks.loading);
+    if (connect.scanning !== scanning) { connect.scanning = scanning; jobs.push(connect.head.setBusy(scanning)); }
+    if (connect.wired !== wired) {
+      connect.wired = wired;
+      jobs.push(UI.setEnabled(win, connect.head.id, !wired));
+      jobs.push(UI.setLayoutSize(win, connect.head.id, { x: 'auto', y: wired ? 0 : connect.head.height }));
+    }
+    if (connect.working !== !!wifi?.state?.working) {
+      connect.working = !!wifi?.state?.working;
+      connect.badge.pulse(connect.working);
+    }
+    if (connect.networkError !== networks.error) {
+      if (error === connect.networkError || networks.error) error = networks.error || '';
+      connect.networkError = networks.error;
+    }
+    if (connect.error !== error) { connect.error = error; jobs.push(paintStatus()); }
+    await Promise.all(jobs);
+
+    if (chosen) chosen = list.find(network => network.key === chosen.key);
+    if (!chosen && connect.selection) { wifiPassword = ''; await removeSelection(connect); }
+
+    // The power control is created once. Its height participates in the list
+    // only while the device is off.
+    if (!wired && networks.enabled === false && !connect.power) {
+      const surface = await kit.surface('inset', { size: { x: mainWidth(), y: ROW + 8 + SPACE.s * 2 },
+        layout: { type: 'column' }, padding: { t: SPACE.s, r: SPACE.m, b: SPACE.s, l: SPACE.m } });
+      const line = await UI.createElement(win, { layout: { type: 'row', alignItems: 'center', gap: SPACE.s }, item: { size: { x: 'auto', y: ROW + 8 } } });
+      const words = await lines(line, 'Wi-Fi', networks.hardware === false ? 'Blocked by the device' : 'Off', inner() - 56 - SPACE.s);
+      const control = await toggle(win, null, false, () => serial(() => wifi?.toggle()));
+      await Promise.all([UI.attach(win, line, control.id), UI.attach(win, surface.content, line), UI.setElementId(win, control.id, 'installer-wifi-power')]);
+      await UI.attach(win, connect.list, surface.id);
+      connect.power = { id: surface.id, control, detail: words.caption, hardware: networks.hardware };
+    }
+    if (connect.power && (wired || networks.enabled !== false)) {
+      await UI.destroyElement(win, connect.power.id);
+      connect.power = undefined;
+    }
+    if (connect.power) {
+      const powerJobs = [];
+      if (connect.power.hardware !== networks.hardware) {
+        connect.power.hardware = networks.hardware;
+        powerJobs.push(UI.setTextString(win, connect.power.detail, networks.hardware === false ? 'Blocked by the device' : 'Off'));
+      }
+      await Promise.all(powerJobs);
+    }
+
+    const incoming = new Set(list.map(network => network.key));
+    await Promise.all([...connect.rows].filter(([key]) => !incoming.has(key)).map(async ([key, entry]) => {
+      if (connect.selection?.key === key) await removeSelection(connect);
+      await UI.destroyElement(win, entry.id); connect.rows.delete(key);
+    }));
+    // Create only new rows. Their handler reads the current network record,
+    // because NetworkManager replaces record objects on every refresh.
+    for (const network of list) {
+      if (connect.rows.has(network.key)) continue;
+      const entry = { network, snapshot: {} };
+      entry.id = await row(win, null, mainWidth(), ROW + 8, () => serial(async () => {
+        const current = entry.network;
+        if (!current.supported || current.connected) return;
+        chosen = chosen?.key === current.key ? undefined : current;
+        wifiPassword = '';
+        await reconcileConnect();
+      }), { colour: () => chosen?.key === entry.network.key ? SURFACE.selected : SURFACE.card,
+        cursor: () => entry.network.supported && !entry.network.connected ? 'pointer' : 'default' });
+      entry.icon = await icon(win, entry.id, signal(network), 20, 28, ROW + 8);
+      const words = await lines(entry.id, network.name, security(network), mainWidth() - 12 - 8 - 28 - 12,
+        network.supported ? [TEXT.primary, network.connected ? TEXT.accent : TEXT.secondary] : [TEXT.disabled, TEXT.disabled]);
+      entry.heading = words.heading; entry.caption = words.caption;
+      await Promise.all([UI.setElementId(win, entry.id, 'installer-network-' + network.name), UI.attach(win, connect.list, entry.id)]);
+      entry.snapshot = { name: network.name, signal: signal(network), security: security(network),
+        supported: network.supported, connected: network.connected, selected: chosen?.key === network.key, index: -1 };
+      connect.rows.set(network.key, entry);
+    }
+    await Promise.all(list.map(async (network, index) => {
+      const entry = connect.rows.get(network.key), prior = entry.snapshot;
+      entry.network = network;
+      const selected = chosen?.key === network.key, updates = [];
+      if (prior.name !== network.name) {
+        updates.push(UI.setTextString(win, entry.heading, network.name));
+        updates.push(UI.setElementId(win, entry.id, 'installer-network-' + network.name));
+      }
+      if (prior.signal !== signal(network)) updates.push(UI.setTexture(win, entry.icon, signal(network)));
+      if (prior.security !== security(network)) updates.push(UI.setTextString(win, entry.caption, security(network)));
+      if (prior.supported !== network.supported) updates.push(UI.setTextColour(win, entry.heading, network.supported ? TEXT.primary : TEXT.disabled));
+      if (prior.supported !== network.supported || prior.connected !== network.connected)
+        updates.push(UI.setTextColour(win, entry.caption, !network.supported ? TEXT.disabled : network.connected ? TEXT.accent : TEXT.secondary));
+      if (prior.selected !== selected) updates.push(UI.setBoxColour(win, entry.id, selected ? SURFACE.selected : SURFACE.card));
+      if (prior.index !== index) updates.push(UI.setLayoutOrder(win, entry.id, index * 2 + 1));
+      entry.snapshot = { name: network.name, signal: signal(network), security: security(network),
+        supported: network.supported, connected: network.connected, selected, index };
+      await Promise.all(updates);
+    }));
+
+    if (chosen && (!connect.selection || connect.selection.key !== chosen.key || connect.selection.password !== chosen.password)) {
+      await removeSelection(connect);
+      const height = (chosen.password ? 2 : 1) * ROW + SPACE.s * 2;
+      const surface = await kit.surface('inset', { size: { x: mainWidth(), y: height }, layout: { type: 'column' },
+        padding: { t: SPACE.s, r: SPACE.m, b: SPACE.s, l: SPACE.m } });
+      let input;
+      if (chosen.password) input = await field(surface.content, 'Password', wifiPassword, value => { wifiPassword = value; },
+        { password: true, id: 'installer-wifi-password', submit: () => serial(joinChosen) });
+      const actions = await UI.createElement(win, { layout: { type: 'row', justifyContent: 'end', alignItems: 'center' }, item: { size: { x: 'auto', y: ROW } } });
+      const connectButton = await pill(win, null, 'Connect', ACTION, () => serial(joinChosen), { colour: SURFACE.accent,
+        labelColour: TEXT.onAccent, height: 34, onFeedback: value => { view.connectFeedback = value; } });
+      await Promise.all([UI.attach(win, actions, connectButton), UI.setElementId(win, connectButton, 'installer-connect')]);
+      await UI.attach(win, surface.content, actions);
+      await UI.attach(win, connect.list, surface.id);
+      connect.selection = { key: chosen.key, password: chosen.password, id: surface.id, height, input };
+      if (input) await input.focus();
+    }
+    if (connect.selection) {
+      const index = list.findIndex(network => network.key === connect.selection.key);
+      if (connect.selection.index !== index) {
+        connect.selection.index = index;
+        await UI.setLayoutOrder(win, connect.selection.id, index * 2 + 2);
+      }
+    }
+
+    const emptyKind = wired && !online ? 'cable' : !wired && !list.length && !scanning && networks.enabled !== false ? 'wifi' : '';
+    if (connect.empty?.kind !== emptyKind) {
+      if (connect.empty) { await UI.destroyElement(win, connect.empty.id); connect.empty = undefined; }
+      if (emptyKind) {
+        const empty = await kit.emptyState({ glyph: '/rom/assets/status/' + (emptyKind === 'cable' ? 'ethernet' : 'wifi-off') + '.png',
+          message: emptyKind === 'cable' ? 'Connect a network cable' : 'No networks', width: mainWidth(), height: 96 });
+        await UI.attach(win, connect.list, empty.id);
+        connect.empty = { kind: emptyKind, id: empty.id };
+      }
+    }
+    const pieces = (connect.power ? [ROW + 8 + SPACE.s * 2] : [])
+      .concat(list.map(network => ROW + 8 + (connect.selection?.key === network.key ? connect.selection.height + SPACE.s : 0)),
+        connect.empty ? [96] : []);
+    const height = pieces.reduce((sum, piece) => sum + piece, 0) + Math.max(0, pieces.length - 1) * SPACE.s;
+    if (height !== connect.height) {
+      bodyFill += height - connect.height; connect.height = height;
+      await Promise.all([UI.setLayoutSize(win, connect.list, { x: mainWidth(), y: height }), body.setContentHeight(Math.max(0, bodyFill - SPACE.s))]);
+    }
+  };
+  const removeSelection = async connect => {
+    const selection = connect.selection;
+    if (!selection) return;
+    connect.selection = undefined; view.connectFeedback = undefined;
+    if (selection.input) {
+      await selection.input.destroy();
+      inputs = inputs.filter(input => input !== selection.input);
+    }
+    await UI.destroyElement(win, selection.id);
+  };
+
   // ---- Timezone picker ---------------------------------------------------------
   // A search field over the matching zones: every row names the city, its
   // country and region, and the time there now. Typing narrows the list
@@ -584,7 +711,7 @@ export async function installer() {
     if (closed) return;
     if (view.welcome !== (page === 'welcome')) await buildChrome();
     const key = viewKey(), turned = key !== view.shownPage, direction = key > view.shownPage ? 1 : -1;
-    view.dispose?.(); view.dispose = undefined; view.install = undefined;
+    view.dispose?.(); view.dispose = undefined; view.install = undefined; view.connect = undefined;
     for (const input of inputs) await input.destroy();
     inputs = [];
     if (body) await UI.destroyElement(win, body.id);
@@ -630,7 +757,7 @@ export async function installer() {
     wifiPassword = '';
     if (accepted) { chosen = undefined; error = ''; await checkConnection(); }
     else { error = wifi.state.error || 'Could not connect'; play(view.status, presets.shake()); }
-    await render();
+    await reconcileConnect();
   };
   const goBack = async () => {
     if (installing) return;
@@ -693,17 +820,19 @@ export async function installer() {
   await buildChrome();
   await render();
   Log.info('Installer view ready');
-  // Network updates repaint the connect page, but never under a password being typed.
+  // Reconcile published scan and connection state without replacing the page.
   const onNetworks = value => {
     const connected = value.networks.some(network => network.connected), wasConnected = (networks.networks || []).some(network => network.connected);
     networks = value;
     if (page !== 'connect') return;
-    if (connected && !wasConnected) serial(async () => { await checkConnection(); chosen = undefined; wifiPassword = ''; error = ''; await render(); });
-    else if (!chosen) serial(render);
+    serial(async () => {
+      if (connected && !wasConnected) { await checkConnection(); chosen = undefined; wifiPassword = ''; error = ''; }
+      await reconcileConnect();
+    });
   };
   wifi = preview ? mockWifi(onNetworks, api) : wifiNetwork(onNetworks);
   setTimeout(() => wifi.start().catch(reason => { error = reason.message; serial(paintStatus); }), 0);
-  setTimeout(() => serial(async () => { await checkConnection(); await render(); }), 0);
+  setTimeout(() => serial(async () => { await checkConnection(); await reconcileConnect(); }), 0);
   // While offline on the connect page, keep checking, so a cable plugged in
   // shows up without pressing Continue. Checks never overlap or block the UI,
   // and never repaint under a Wi-Fi password being typed.
@@ -711,7 +840,7 @@ export async function installer() {
     if (closed) return;
     if (page === 'connect' && !online && !chosen) {
       const now = (await api.connection().catch(() => ({ online: false }))).online;
-      if (now && !online && page === 'connect' && !closed) { online = true; error = ''; serial(render); }
+      if (now && !online && page === 'connect' && !closed) { online = true; error = ''; serial(reconcileConnect); }
     }
     setTimeout(watchConnection, 3000);
   };
@@ -725,8 +854,9 @@ export async function installer() {
     scan: () => wifi.scan(), idle: () => rendering,
     selectDisk: path => { const disk = disks.find(item => item.path === path); if (disk && !disk.reason) { config.disk = path; config.diskKey = disk.key; } },
     timezone: () => serial(openPicker),
-    choose: name => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = ''; await render(); }),
+    choose: name => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = ''; await reconcileConnect(); }),
     connect: (name, password) => serial(async () => { chosen = (networks.networks || []).find(network => network.name === name); wifiPassword = password || ''; await joinChosen(); }),
+    networks: items => wifi.setNetworks(items),
     fill: values => { Object.assign(config, values.config || {}); Object.assign(secrets, values.secrets || {}); },
     state: () => ({ page, installing, done, failed, error, scanning: wifi?.state?.scanning }), window: win
   };
