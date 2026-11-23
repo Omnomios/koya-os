@@ -119,15 +119,40 @@ console.log('Live keyring preparation and target repository: passed');
 
 const greeterWork=fs.mkdtempSync(path.join(os.tmpdir(),'koya-greeter-install-test-'));
 try {
- const result=spawnSync('/bin/bash',['-euc',
-  'root=$1; payload=$root/payload; mnt=$2; source "$root/backend/desktop.sh"; systemctl(){ printf "%s\\n" "$*"; }; configure_greeter',
-  'test',root,greeterWork],{encoding:'utf8'});
- assert.equal(result.status,0,result.stderr);
- assert.match(result.stdout,/enable greetd.service/);
- assert.match(fs.readFileSync(greeterWork+'/etc/greetd/config.toml','utf8'),/command = "\/usr\/bin\/koya-greeter --raw-tty \/dev\/tty1"/);
- assert(fs.statSync(greeterWork+'/usr/local/libexec/koya-greetd').mode & 0o111);
- assert(fs.statSync(greeterWork+'/usr/local/libexec/koya-greeter-autologin').mode & 0o111);
- assert(!fs.existsSync(greeterWork+'/usr/local/bin/koya-greeter'));
+ for(const supportsActivation of [true,false]) {
+  const target=greeterWork+'/'+(supportsActivation?'fresh':'older');
+  const helper=target+'/usr/share/koya-shell/install-fingerprint.py';
+  fs.mkdirSync(path.dirname(helper),{recursive:true});
+  fs.mkdirSync(target+'/etc/greetd',{recursive:true});
+  fs.writeFileSync(target+'/etc/greetd/config.toml','old package config\n');
+  fs.writeFileSync(helper,supportsActivation
+   ? 'parser.add_argument("--package-activate")\n'
+   : 'parser.add_argument("--package-activate-old")\n');
+  const code=`root=$1; payload=$root/payload; mnt=$2
+source "$root/backend/desktop.sh"
+arch-chroot(){
+ cmp -s "$payload/greeter/config.toml" "$mnt/etc/greetd/config.toml" || return 1
+ cmp -s "$payload/greeter/koya-greetd" "$mnt/usr/local/libexec/koya-greetd" || return 1
+ cmp -s "$payload/greeter/koya-greeter-autologin" "$mnt/usr/local/libexec/koya-greeter-autologin" || return 1
+ printf 'chroot %s\\n' "$*"
+}
+systemctl(){ printf 'systemctl %s\\n' "$*"; }
+configure_greeter`;
+  const result=spawnSync('/bin/bash',['-euc',code,'test',root,target],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+  const lines=result.stdout.trim().split('\n');
+  const activation=`chroot ${target} /usr/bin/python3 /usr/share/koya-shell/install-fingerprint.py --package-activate --platform arch`;
+  assert.deepEqual(lines,supportsActivation
+   ? [activation,`systemctl --root=${target} enable greetd.service`]
+   : [`systemctl --root=${target} enable greetd.service`]);
+  assert.equal(fs.readFileSync(target+'/etc/greetd/config.toml','utf8'),fs.readFileSync(root+'/payload/greeter/config.toml','utf8'));
+  assert.equal(fs.readFileSync(target+'/etc/systemd/system/greetd.service.d/koya.conf','utf8'),fs.readFileSync(root+'/payload/greeter/greetd-koya.conf','utf8'));
+  for(const wrapper of ['koya-greetd','koya-greeter-autologin']) {
+   assert.equal(fs.readFileSync(target+'/usr/local/libexec/'+wrapper,'utf8'),fs.readFileSync(root+'/payload/greeter/'+wrapper,'utf8'));
+   assert(fs.statSync(target+'/usr/local/libexec/'+wrapper).mode & 0o111);
+  }
+  assert(!fs.existsSync(target+'/usr/local/bin/koya-greeter'));
+ }
  const hypr=fs.readFileSync(root+'/payload/profile/config/hypr/hyprland.lua','utf8');
  assert(hypr.includes('hl.exec_cmd("/usr/bin/koya-shell")'));
  assert(!hypr.includes('projects/koya-bar'));

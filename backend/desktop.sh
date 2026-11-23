@@ -25,5 +25,9 @@ configure_greeter() {
   install -m 644 "$payload/greeter/greetd-koya.conf" "$mnt/etc/systemd/system/greetd.service.d/koya.conf"
   install -m 644 "$payload/greeter/org.koya.greeter.policy" "$mnt/usr/share/polkit-1/actions/org.koya.greeter.policy"
   install -m 755 "$payload/greeter/koya-greetd" "$payload/greeter/koya-greeter-autologin" "$mnt/usr/local/libexec/"
+  local fingerprint_helper=$mnt/usr/share/koya-shell/install-fingerprint.py
+  if [[ -f $fingerprint_helper ]] && grep -Eq -- "['\"]--package-activate['\"]" "$fingerprint_helper"; then
+    arch-chroot "$mnt" /usr/bin/python3 /usr/share/koya-shell/install-fingerprint.py --package-activate --platform arch
+  fi
   systemctl --root="$mnt" enable greetd.service
 }
