@@ -131,9 +131,10 @@ try {
   const code=`root=$1; payload=$root/payload; mnt=$2
 source "$root/backend/desktop.sh"
 arch-chroot(){
- cmp -s "$payload/greeter/config.toml" "$mnt/etc/greetd/config.toml" || return 1
- cmp -s "$payload/greeter/koya-greetd" "$mnt/usr/local/libexec/koya-greetd" || return 1
- cmp -s "$payload/greeter/koya-greeter-autologin" "$mnt/usr/local/libexec/koya-greeter-autologin" || return 1
+ node -e 'const fs=require("node:fs"); for(let i=1;i<process.argv.length;i+=2) if(!fs.readFileSync(process.argv[i]).equals(fs.readFileSync(process.argv[i+1]))) process.exit(1)' \
+  "$payload/greeter/config.toml" "$mnt/etc/greetd/config.toml" \
+  "$payload/greeter/koya-greetd" "$mnt/usr/local/libexec/koya-greetd" \
+  "$payload/greeter/koya-greeter-autologin" "$mnt/usr/local/libexec/koya-greeter-autologin" || return 1
  printf 'chroot %s\\n' "$*"
 }
 systemctl(){ printf 'systemctl %s\\n' "$*"; }
